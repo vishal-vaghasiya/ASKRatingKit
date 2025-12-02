@@ -44,6 +44,14 @@ public final class ASKRatingKit {
             SKStoreReviewController.requestReview(in: scene)
         }
     }
+    
+    public func askRating() {
+        guard let topVC = UIApplication.topViewController() else { return }
+        
+        if let scene = topVC.view.window?.windowScene {
+            SKStoreReviewController.requestReview(in: scene)
+        }
+    }
 
     // MARK: - Prompt Logic
 
