@@ -14,6 +14,7 @@ public final class ASKRatingKit {
 
     /// UserDefaults key for storing the last date the prompt was shown.
     private let lastAskedKey = "ASKRatingKit.lastAsked"
+    private let firstLaunchKey = "ASKRatingKit.firstLaunch"
 
     // MARK: - Singleton
 
@@ -26,9 +27,7 @@ public final class ASKRatingKit {
     private init() {}
 
     /// UserDefaults instance used for storing prompt date.
-    private var userDefaults: UserDefaults {
-        return .standard
-    }
+    private let userDefaults = UserDefaults.standard
 
     // MARK: - Public API
     /// Attempts to automatically request a rating popup from the top-most visible view controller.
@@ -36,9 +35,6 @@ public final class ASKRatingKit {
     public func requestRatingIfNeeded() {
         guard shouldShowPrompt(),
               let topVC = UIApplication.topViewController() else { return }
-        
-        // Store the current date as the last asked date.
-        userDefaults.set(Date(), forKey: lastAskedKey)
         
         if let scene = topVC.view.window?.windowScene {
             SKStoreReviewController.requestReview(in: scene)
@@ -56,14 +52,32 @@ public final class ASKRatingKit {
     // MARK: - Prompt Logic
 
     /// Determines whether the rating prompt should be displayed.
-    /// Ensures the prompt is shown only once per calendar day (single-day one-ask rule).
+    /// Shows prompt only if 2 days have passed since first launch and not already asked today.
     private func shouldShowPrompt() -> Bool {
-        // Already asked today → stop
+        let now = Date()
 
-        if let asked = userDefaults.object(forKey: lastAskedKey) as? Date,
-           Calendar.current.isDateInToday(asked) {
+        // Save the first launch date.
+        if userDefaults.object(forKey: firstLaunchKey) == nil {
+            userDefaults.set(now, forKey: firstLaunchKey)
             return false
         }
+
+        // Don't show the rating prompt until 2 days after first launch.
+        guard let firstLaunchDate = userDefaults.object(forKey: firstLaunchKey) as? Date,
+              let eligibleDate = Calendar.current.date(byAdding: .day, value: 2, to: firstLaunchDate),
+              now >= eligibleDate else {
+            return false
+        }
+
+        // Don't ask again for 30 days after the last request.
+        if let asked = userDefaults.object(forKey: lastAskedKey) as? Date,
+           let nextEligibleDate = Calendar.current.date(byAdding: .day, value: 30, to: asked),
+           now < nextEligibleDate {
+            return false
+        }
+
+        // Mark today as the last prompt date.
+        userDefaults.set(now, forKey: lastAskedKey)
 
         return true
     }
